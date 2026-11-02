@@ -1,4 +1,4 @@
-# Development handoff — not a verified release
+# Development handoff — CI-verified debug build, not a production release
 
 ## Repository and scope
 
@@ -8,7 +8,27 @@
   `89fb2c54e686265db13f8fbe938272355da0fc44`. No prior app or financial database was
   found or overwritten. The master specification is preserved in MASTER_PROMPT.md.
 - Fresh package `com.reazempire.amarhisab.fresh`, debug certificate for debug APKs.
-  No production signing material, real financial data or secrets were added.
+  No production signing material, real financial data or secrets were added. CI
+  debug keys are ephemeral; future production upgrades need a stable signing key.
+
+## Verified delivery
+
+Built source: `2b6d685ff3b82fcd2e9f67e53c1920e13d754712`.
+
+- Successful run: https://github.com/reazempiree/amarhisab/actions/runs/41512534715
+- APK/checksum/lockfile/test summary artifact:
+  https://github.com/reazempiree/amarhisab/actions/runs/41512534715/artifacts/13174112324
+- Formatted source and diagnostic artifact:
+  https://github.com/reazempiree/amarhisab/actions/runs/41512534715/artifacts/13175445152
+- Flutter 3.47.9, formatting, analysis, 5 calculation tests, 21 SQLite/backup
+  tests, 3 widget cases and the debug APK build passed in CI. Artifact retention
+  is 14 days. No device startup, GitHub Release or store publication was performed.
+- A failed period-close operation no longer emits a false success message.
+- The original combined widget fixture stalled. The final widget fixture uses
+  databaseFactoryFfiNoIsolate with native-I/O initialization waits; ledger tests
+  retain the normal FFI factory. All assertions remain enabled and pass in CI.
+- CI has contents:read permission. An attempted repository-write/automatic-commit
+  proposal was rejected by automatic review and replaced with artifact uploads.
 
 ## Runtime tools retained outside the checkout
 
@@ -49,13 +69,14 @@ flutter config --android-sdk "$ANDROID_HOME"
 ./tool/validate.sh
 ```
 
-These Flutter commands have NOT yet executed successfully. Dependencies have not
-been resolved, so no pubspec.lock exists. Review and commit the genuine resolved
-lockfile. Fix any formatter/analyzer/type/plugin/test errors before claiming
-readiness. The Android host was rendered from this Flutter revision's official
+These commands have not executed successfully in the local cloud machine. CI
+has executed their Flutter validation equivalents successfully. Its genuine
+resolved pubspec.lock and formatted source are retained in the verification
+artifacts, not yet retrieved into this checkout. Retrieve and commit the verified
+lockfile after API/artifact access is available; never fabricate one. The Android host was rendered from this Flutter revision's official
 Kotlin templates, with FlutterFragmentActivity for local_auth, API 24 minimum,
 automatic Android backup disabled, secure-window flag and no release signing key.
-Verify AGP 9.1.0/Kotlin 2.4.0/plugin compatibility on the actual build.
+AGP 9.1.0/Kotlin 2.4.0/plugin compatibility passed the debug APK build in CI.
 
 ## Validation evidence
 
@@ -64,12 +85,21 @@ Verify AGP 9.1.0/Kotlin 2.4.0/plugin compatibility on the actual build.
   transaction rollback and cascaded removal, dependency restriction, unique reversal.
 - All 13 Dart files passed a supplemental tree-sitter grammar parse. This does not
   validate imports, types, packages, Flutter APIs, lints or runtime behavior.
-- Dart/Flutter formatting, analysis, tests and APK build are all UNRUN because the
-  official SDK cannot initialize. Device startup is UNRUN; no device is attached.
-- Unit/SQLite/backup/widget test sources were authored, not reported as passing.
-  They may expose defects once executable and must be run and fixed honestly.
-- The Actions workflow checks analysis/tests before uploading a debug APK and SHA256.
-  Do not invent a run URL or artifact URL; inspect actual outcomes after push.
+- Dart formatting, Flutter analysis, all three test suites (29 cases), APK build
+  and checksum generation passed in the final CI run linked above.
+- No emulator/device is attached and no /dev/kvm is available. Android startup
+  and native file picker, secure storage, biometric and resume flows are UNRUN.
+- Rollback tests inject native SQL failures midway through destructive deletion
+  and period close. Both preserve the entire pre-operation financial snapshot.
+- The GitHub artifact archive digest is not the APK digest. Verify the contained
+  APK using its SHA256SUMS file. No local APK download is claimed: normal artifact
+  download returned 404 without usable API/artifact access in this cloud context.
+- Tooling/reporter changes preserve pipeline exit statuses and exclude hidden test
+  loader events from counts. The reporter was additionally checked with a local
+  synthetic event stream; this is separate from the 29 application cases.
+- Reusable install_script and start_skill were successfully saved in the cloud
+  draft. This did not change network policy, initialize local Flutter or publish
+  the environment. Review/save/publish remains a user action in environment settings.
 
 ## Implementation map
 
@@ -95,7 +125,7 @@ Verify AGP 9.1.0/Kotlin 2.4.0/plugin compatibility on the actual build.
    confirmed policy, document the example and extend the tests.
 2. Full device integration for backup picker paths, encryption round-trip, lock
    resume while modals are open, biometrics, secure storage and actual APK startup.
-3. More mandatory coverage for failure injection at native persistence boundaries,
+3. More mandatory coverage for Android process interruptions and native persistence boundaries,
    destructive flows, full-app small-screen/large-text navigation, native migration
    behavior and process restarts. Widget tests currently cover initial dashboard
    themes and an outlined amount card at 2x text scale, not the entire app at 2x.
