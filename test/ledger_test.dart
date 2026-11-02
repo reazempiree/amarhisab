@@ -134,4 +134,74 @@ void main(){
     final before=jsonEncode(snapshot);
     await expectLater(ledger.restore(broken),throwsA(anything));expect(jsonEncode(await ledger.export()),before);
   });
+  test('historical funding example and every funded expense wallet',() async {
+    await ledger.fund('opening','bd_bank',9000000);
+    await ledger.fund('deposit','bd_bank',1000000);
+    await bd('send',amount:3000000);
+    expect(await ledger.balance('bd_bank'),7000000);
+    final totals=await ledger.summary(account:'bd_bank');
+    expect(totals['funding'],10000000);expect(totals['remitted'],3000000);
+    final earned=(await ledger.summary())['profit'];
+    await ledger.expense('bd_expense','bd_bank',100);
+    await ledger.expense('principal_expense','principal',100);
+    await ledger.expense('profit_expense','profit',100);
+    expect(await ledger.balance('bd_bank'),6999900);
+    expect((await ledger.summary())['profit'],earned);
+    expect((await ledger.summary())['expense_BDT'],100);
+    expect((await ledger.summary())['expense_AED'],200);
+  });
+  test('bank-to-bank transfers never create historical funding',() async {
+    await ledger.addAccount('দ্বিতীয় ব্যাংক','BDT','bank');
+    final other=(await ledger.accounts()).firstWhere((a)=>a['role']=='bank'&&a['id']!='bd_bank')['id'] as String;
+    await ledger.fund('opening','bd_bank',10000000);
+    await ledger.transfer('move','bd_bank',other,2000000);
+    expect(await ledger.balance(other),2000000);
+    expect((await ledger.summary(account:'bd_bank'))['funding'],10000000);
+    expect((await ledger.summary(account:other))['funding'],0);
+  });
+  test('partial agent payments and outside-account settlement block deletion',() async {
+    await ledger.fund('cash','reserve',300000);await pk('pk');
+    await ledger.payAgent('partial','reserve',50000);
+    expect(await ledger.balance('agent_payable'),-150000);
+    final preview=await ledger.previewDeletion('principal');
+    expect(preview.blockers,isNotEmpty);
+    final receipt=await backup(),before=jsonEncode(await ledger.export());
+    await expectLater(ledger.deleteAccountTransactions('erase','principal',confirmation:'DELETE',backup:receipt),throwsA(isA<LedgerException>()));
+    expect(jsonEncode(await ledger.export()),before);
+  });
+  test('native failure midway through permanent deletion rolls everything back',() async {
+    await ledger.fund('fund','bd_bank',10000000);await bd('send');
+    final receipt=await backup(),before=jsonEncode(await ledger.export());
+    await ledger.db.execute("CREATE TRIGGER fail_deletion BEFORE DELETE ON operations WHEN OLD.id='send' BEGIN SELECT RAISE(ABORT,'injected failure'); END");
+    await expectLater(ledger.deleteAccountTransactions('erase','bd_bank',confirmation:'DELETE',backup:receipt),throwsA(anything));
+    expect(jsonEncode(await ledger.export()),before);
+    expect((await ledger.db.query('deletion_events')),isEmpty);
+    await ledger.integrity();
+  });
+  test('native failure during period close rolls back cash transfer and archive',() async {
+    await ledger.fund('fund','bd_bank',10000000);await bd('send');
+    final before=jsonEncode(await ledger.export());
+    await ledger.db.execute("CREATE TRIGGER fail_period BEFORE INSERT ON periods WHEN EXISTS(SELECT 1 FROM periods WHERE ended IS NOT NULL) BEGIN SELECT RAISE(ABORT,'injected failure'); END");
+    await expectLater(ledger.closePeriod('close',reconciled:true),throwsA(anything));
+    expect(jsonEncode(await ledger.export()),before);
+    expect(await ledger.balance('profit'),1949);await ledger.integrity();
+  });
+  test('backup restore includes archived periods, advances and deletion metadata',() async {
+    await ledger.fund('fund','bd_bank',10000000);await bd('send');
+    await ledger.closePeriod('close',reconciled:true);
+    await ledger.payAgent('advance','principal',10000);
+    await ledger.fund('reserve','reserve',5000);
+    final receipt=await backup();
+    await ledger.deleteAccountTransactions('erase','reserve',confirmation:'DELETE',backup:receipt);
+    final snapshot=await ledger.export(),service=BackupService();
+    final decoded=await service.decrypt(await service.encrypt(snapshot,'secure-test-password'),'secure-test-password');
+    final restored=await Ledger.open('${directory.path}/metadata_restore.db',factory:databaseFactoryFfi);
+    try {
+      await restored.restore(decoded);expect(await restored.export(),snapshot);
+      expect(await restored.balance('agent_advance'),10000);
+      expect((await restored.db.query('periods',where:'ended IS NOT NULL')).length,1);
+      expect((await restored.db.query('deletion_events')).length,1);await restored.integrity();
+    } finally {await restored.db.close();}
+  });
+
 }
