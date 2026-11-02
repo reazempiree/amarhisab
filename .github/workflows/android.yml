@@ -28,10 +28,20 @@ jobs:
       - run: flutter --version | tee flutter-version.txt
       - run: flutter pub get
       - run: dart format lib test
-      - run: flutter analyze
-      - name: Run application tests
+      - id: analyze
+        run: flutter analyze
+      - name: Test exact financial calculations
+        if: always() && steps.analyze.outcome == 'success'
+        timeout-minutes: 3
+        run: flutter test test/money_test.dart --machine | tee money-test-results.jsonl
+      - name: Test SQLite ledger and encrypted backups
+        if: always() && steps.analyze.outcome == 'success'
         timeout-minutes: 5
-        run: flutter test --machine | tee test-results.jsonl
+        run: flutter test test/ledger_test.dart --machine | tee ledger-test-results.jsonl
+      - name: Test Bengali widgets and themes
+        if: always() && steps.analyze.outcome == 'success'
+        timeout-minutes: 3
+        run: flutter test test/widget_test.dart --machine | tee widget-test-results.jsonl
       - name: Summarize actual test outcomes
         if: always()
         run: python3 tool/summarize_tests.py
@@ -59,7 +69,7 @@ jobs:
           path: |
             flutter-version.txt
             pubspec.lock
-            test-results.jsonl
+            *-test-results.jsonl
             test-summary.json
             lib/
             test/

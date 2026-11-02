@@ -15,7 +15,7 @@ void main(){
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
       const MethodChannel('plugins.it_nomads.com/flutter_secure_storage'),(_) async=>null);
     directory=await Directory.systemTemp.createTemp('amar_widget_');
-    ledger=await Ledger.open('${directory.path}/test.db',factory:databaseFactoryFfi);
+    ledger=await Ledger.open('${directory.path}/test.db',factory:databaseFactoryFfiNoIsolate);
     await ledger.setSetting('welcome','seen');
   });
   tearDown(() async {await ledger.db.close();await directory.delete(recursive:true);});
