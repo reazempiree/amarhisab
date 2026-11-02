@@ -24,7 +24,14 @@ void main(){
       tester.view.physicalSize=const Size(360,720);tester.view.devicePixelRatio=1;
       addTearDown(tester.view.resetPhysicalSize);addTearDown(tester.view.resetDevicePixelRatio);
       await ledger.setSetting('theme',dark?'dark':'light');
-      await tester.pumpWidget(AmarHisab(ledger:ledger,security:AppSecurity()));
+      await tester.runAsync(() async {
+        await tester.pumpWidget(AmarHisab(ledger:ledger,security:AppSecurity()));
+        final deadline=DateTime.now().add(const Duration(seconds:10));
+        while(find.text('মোট জমা টাকা').evaluate().isEmpty&&DateTime.now().isBefore(deadline)) {
+          await Future<void>.delayed(const Duration(milliseconds:10));
+          await tester.pump();
+        }
+      });
       await tester.pumpAndSettle();
       expect(find.text('আমার হিসাব'),findsOneWidget);expect(find.text('মোট জমা টাকা'),findsOneWidget);
       expect(find.text('বর্তমান ব্যালেন্স'),findsOneWidget);expect(find.byType(OutlineCard),findsWidgets);

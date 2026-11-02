@@ -22,11 +22,16 @@ jobs:
           channel: stable
           cache: true
       - run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
-      - run: flutter --version
+      - run: flutter --version | tee flutter-version.txt
       - run: flutter pub get
       - run: dart format lib test
       - run: flutter analyze
-      - run: flutter test --reporter expanded
+      - name: Run application tests
+        timeout-minutes: 5
+        run: flutter test --machine | tee test-results.jsonl
+      - name: Summarize actual test outcomes
+        if: always()
+        run: python3 tool/summarize_tests.py
       - run: flutter build apk --debug
       - name: Verify packaged application and checksum
         run: |
@@ -38,5 +43,21 @@ jobs:
           path: |
             build/app/outputs/flutter-apk/app-debug.apk
             build/app/outputs/flutter-apk/SHA256SUMS
+            flutter-version.txt
+            test-summary.json
+            pubspec.lock
           if-no-files-found: error
+          retention-days: 14
+      - name: Preserve verification evidence and formatted source
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-evidence-${{ github.sha }}
+          path: |
+            flutter-version.txt
+            pubspec.lock
+            test-results.jsonl
+            test-summary.json
+            lib/
+            test/
           retention-days: 14
