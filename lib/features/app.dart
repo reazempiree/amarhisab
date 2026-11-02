@@ -95,12 +95,17 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
   @override
   void dispose(){WidgetsBinding.instance.removeObserver(this);controller.dispose();super.dispose();}
   void message(String text){if(mounted){ ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(text))); }}
-  Future<void> run(Future<void> Function() action) async {
-    try {await controller.mutate(action);}catch(e,stack){
+  Future<bool> run(Future<void> Function() action) async {
+    try {
+      await controller.mutate(action);
+      return true;
+    } catch(e,stack) {
       debugPrint('Ledger action failed\n$stack');
-      message(e is LedgerException||e is FormatException?e.toString():'কাজটি সম্পন্ন হয়নি। ডেটা অপরিবর্তিত আছে; আবার যাচাই করুন।');
+      message(e is LedgerException||e is FormatException?e.toString():'কাজটি সম্পন্ন হয়নি। হিসাব আবার যাচাই করুন।');
+      return false;
+    } finally {
+      if(mounted){setState((){});}
     }
-    if(mounted){ setState((){}); }
   }
   Future<void> initialPrompt() async {
     if(await widget.ledger.setting('welcome')!=null){ return; }
@@ -245,8 +250,9 @@ class _HomeState extends State<Home> with WidgetsBindingObserver {
       'আগে নথিভুক্ত খরচ আবার লিখবেন না। নগদ হাতে রাখলে মূলধনে যাবে; দেশে পাঠাতে হলে আগে প্রকৃত ফেরত লেনদেন করুন।\n'
       'অপরিশোধিত এজেন্ট পাওনা বহাল থাকবে। বন্ধ হিসাবের লেনদেন আর মুছতে বা বাতিল করতে পারবেন না।')){ return; }
     if(!await authenticate()){ return; }
-    await run(()=>widget.ledger.closePeriod(operationKey(),reconciled:true));
-    message('নতুন হিসাব শুরু হয়েছে');
+    if(await run(()=>widget.ledger.closePeriod(operationKey(),reconciled:true))) {
+      message('নতুন হিসাব শুরু হয়েছে');
+    }
   }
   Future<void> archives() async {
     final periods=await widget.ledger.db.query('periods',where:'ended IS NOT NULL',orderBy:'id DESC');
